@@ -1,208 +1,162 @@
 """
-RAG Engine Module - Kết nối Vector Database, Embeddings và LLM (Gemini)
+RAG Engine Module - Tạo mã Embedding, lưu trữ vào Vector DB (Chroma) 
+và thực hiện truy vấn kết hợp Gom nhóm Ngữ nghĩa (Semantic Grouping) với Gemini.
 """
 
 import os
-from typing import List, Dict, Tuple
+from typing import List, Dict
 from dotenv import load_dotenv
-import chromadb
-from chromadb.config import Settings
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import ChatPromptTemplate
 
+# Tải biến môi trường từ file .env (Để lấy GEMINI_API_KEY)
+load_dotenv()
 
-class RAGEngine:
+class LegalBrainEngine:
     """
-    RAG Engine - Quản lý Vector Database, Embeddings và LLM
-    - Lưu trữ chunks vào ChromaDB
-    - Tìm kiếm semantic tương ứng queries
-    - Sử dụng Gemini Pro để sinh response
+    Bộ não xử lý RAG nâng cao cho Luật Việt Nam
     """
     
-    def __init__(self, db_path: str = "database", model_name: str = "keepitreal/vietnamese-sbert"):
-        """
-        Khởi tạo RAG Engine
-        
-        Args:
-            db_path: Đường dẫn thư mục lưu ChromaDB
-            model_name: Tên embedding model HuggingFace
-        """
-        load_dotenv()
-        
+    def __init__(self, db_path: str = "database"):
         self.db_path = db_path
-        self.model_name = model_name
         
-        # Khởi tạo ChromaDB
-        self.chroma_client = chromadb.HttpClient(
-            host="localhost",
-            port=8000
-        ) if os.getenv("CHROMADB_MODE") == "server" else self._init_local_chroma()
-        
-        # Khởi tạo Embeddings
-        self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001",
-            google_api_key=os.getenv("GEMINI_API_KEY")
+        print("⏳ Đang khởi tạo Model Embedding (keepitreal/vietnamese-sbert)...")
+        # Sử dụng model SBERT chuyên dụng cho tiếng Việt như cấu hình đề ra
+        self.embedding_model = HuggingFaceEmbeddings(
+            model_name="keepitreal/vietnamese-sbert",
+            model_kwargs={'device': 'cpu'} # Chuyển thành 'cuda' nếu máy có GPU Nvidia
         )
         
-        # Khởi tạo LLM (Gemini Pro)
+        print("🧠 Đang kết nối Bộ não LLM (Gemini Pro)...")
+        # Cấu hình Gemini với temperature = 0 để AI tuyệt đối không tự chế luật
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-pro",
+            model="gemini-2.5-flash", 
             temperature=0,
             google_api_key=os.getenv("GEMINI_API_KEY")
         )
         
-        self.collection = None
-    
-    def _init_local_chroma(self):
-        """Khởi tạo ChromaDB local"""
-        os.makedirs(self.db_path, exist_ok=True)
-        return chromadb.Client(
-            Settings(
-                chroma_db_impl="duckdb",
-                persist_directory=self.db_path,
-                anonymized_telemetry=False
-            )
-        )
-    
-    def add_documents(self, chunks: List[Dict[str, str]], collection_name: str = "law_database"):
+        self.vector_db = None
+
+    def create_vector_db(self, all_chunks: List[Dict[str, str]]):
         """
-        Thêm chunks vào Vector Database
-        
-        Args:
-            chunks: List các chunk với content và metadata
-            collection_name: Tên collection trong ChromaDB
+        Nhận vào list các chunks từ data_loader, tiến hành nhúng vector và lưu vào ổ đĩa local
         """
-        if not chunks:
-            print("⚠️ Không có chunks để thêm")
+        if not all_chunks:
+            print("❌ Không có chunks dữ liệu nào để tạo Vector DB!")
             return
-        
-        # Tạo hoặc lấy collection
-        self.collection = self.chroma_client.get_or_create_collection(
-            name=collection_name,
-            metadata={"hnsw:space": "cosine"}
-        )
-        
-        # Thêm documents
-        ids = []
-        documents = []
-        metadatas = []
-        
-        for idx, chunk in enumerate(chunks):
-            chunk_id = f"doc_{idx}"
-            ids.append(chunk_id)
-            documents.append(chunk["content"])
-            metadatas.append(chunk.get("metadata", {}))
-        
-        self.collection.add(
-            ids=ids,
-            documents=documents,
-            metadatas=metadatas
-        )
-        
-        print(f"✅ Đã thêm {len(chunks)} chunks vào ChromaDB")
-    
-    def search(self, query: str, top_k: int = 3) -> List[Tuple[str, Dict, float]]:
-        """
-        Tìm kiếm semantic trong Vector Database
-        
-        Args:
-            query: Câu hỏi/query từ user
-            top_k: Số kết quả trả về
             
-        Returns:
-            List (content, metadata, similarity_score)
-        """
-        if not self.collection:
-            print("⚠️ Collection chưa được khởi tạo")
-            return []
+        print(f"📦 Đang tiến hành Embedding và lưu {len(all_chunks)} chunks vào ChromaDB tại '{self.db_path}'...")
         
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=top_k
-        )
-        
-        search_results = []
-        
-        if results["documents"] and results["documents"][0]:
-            for doc, metadata, distance in zip(
-                results["documents"][0],
-                results["metadatas"][0],
-                results["distances"][0]
-            ):
-                # Chuyển distance thành similarity (cosine: 0=giống nhất, 1=khác nhất)
-                similarity = 1 - distance
-                search_results.append((doc, metadata, similarity))
-        
-        return search_results
-    
-    def generate_response(
-        self,
-        query: str,
-        context_docs: List[Tuple[str, Dict, float]]
-    ) -> str:
-        """
-        Sinh response từ Gemini dựa trên context
-        
-        Args:
-            query: Câu hỏi của user
-            context_docs: List context từ search()
+        # Chuyển đổi định dạng từ Dict của data_loader sang Object Document của Langchain
+        langchain_docs = []
+        for chunk in all_chunks:
+            doc = Document(
+                page_content=chunk["content"],
+                metadata=chunk["metadata"]
+            )
+            langchain_docs.append(doc)
             
-        Returns:
-            Response từ Gemini
-        """
-        if not context_docs:
-            return "❌ Xin lỗi, không tìm thấy thông tin liên quan trong cơ sở dữ liệu luật pháp."
-        
-        # Xây dựng context prompt
-        context_text = ""
-        sources = set()
-        
-        for idx, (content, metadata, score) in enumerate(context_docs, 1):
-            context_text += f"\n[Nguồn {idx}] {metadata.get('source', 'Unknown')}:\n{content}\n"
-            sources.add(metadata.get('source', 'Unknown'))
-        
-        # Tạo prompt cho Gemini
-        system_prompt = """Bạn là một chuyên gia pháp luật Việt Nam. 
-Trả lời câu hỏi của user dựa CHÍNH XÁC trên thông tin được cung cấp dưới đây.
-Nếu thông tin không có trong context, hãy nói rõ ràng "Không tìm thấy thông tin" thay vì suy luận.
-Luôn trích dẫn nguồn (Điều, Bộ luật) khi đưa ra thông tin.
-Sử dụng tiếng Việt, trả lời ngắn gọn và rõ ràng."""
-        
-        user_prompt = f"""CONTEXT:
-{context_text}
+        # Tạo và lưu trữ Vector DB
+        self.vector_db = Chroma.from_documents(
+            documents=langchain_docs,
+            embedding=self.embedding_model,
+            persist_directory=self.db_path
+        )
+        print("✨ Đã khởi tạo và lưu trữ kho Vector Database thành công!")
 
-CÂUHỎI: {query}
+    def load_existing_db(self):
+        """
+        Load lại kho dữ liệu Vector đã có sẵn trên ổ đĩa (Không cần chạy lại khâu embedding tốn thời gian)
+        """
+        if os.path.exists(self.db_path) and os.listdir(self.db_path):
+            self.vector_db = Chroma(
+                persist_directory=self.db_path,
+                embedding_function=self.embedding_model
+            )
+            print("✅ Đã kết nối thành công tới kho dữ liệu Vector DB hiện có.")
+            return True
+        else:
+            print("⚠️ Không tìm thấy dữ liệu Vector DB cũ. Cần chạy quá trình khởi tạo mới.")
+            return False
 
-Hãy trả lời dựa trên context trên."""
-        
-        # Gọi Gemini
-        try:
-            response = self.llm.invoke(user_prompt)
-            answer = response.content
-            
-            # Thêm trích dẫn nguồn
-            sources_text = "\n\n📚 **Nguồn tham khảo:**\n" + "\n".join([f"- {s}" for s in sources])
-            return answer + sources_text
-            
-        except Exception as e:
-            return f"❌ Lỗi khi gọi Gemini: {str(e)}"
-    
-    def query(self, query: str, top_k: int = 3) -> str:
+    def _semantic_grouping(self, retrieved_docs: List[Document]) -> str:
         """
-        Wrapper: Tìm kiếm + Sinh response
-        
-        Args:
-            query: Câu hỏi của user
-            top_k: Số context trả về
-            
-        Returns:
-            Response cuối cùng
+        [BƯỚC 4 VÀ 5 TRONG CHIẾN LƯỢC]
+        Gom nhóm các đoạn văn bản truy xuất được theo từng FILE và từng ĐIỀU LUẬT 
+        để tạo mạch ngữ cảnh liên tục, giúp LLM đọc hiểu logic nhất.
         """
-        # Tìm kiếm context
-        context_docs = self.search(query, top_k=top_k)
+        grouped_data = {}
         
-        # Sinh response
-        response = self.generate_response(query, context_docs)
+        for doc in retrieved_docs:
+            doc_name = doc.metadata.get("document", "Khác")
+            article = doc.metadata.get("article", "Chung")
+            
+            if doc_name not in grouped_data:
+                grouped_data[doc_name] = {}
+            if article not in grouped_data[doc_name]:
+                grouped_data[doc_name][article] = []
+                
+            grouped_data[doc_name][article].append(doc.page_content)
+            
+        # Nối dữ liệu lại thành một chuỗi văn bản mạch lạc
+        context_string = ""
+        for doc_name, articles in grouped_data.items():
+            context_string += f"\n=== NGUỒN TÀI LIỆU: {doc_name} ===\n"
+            for article_num, contents in articles.items():
+                context_string += f"\n[Các khoản thuộc Điều/Phần {article_num}]:\n"
+                for content in contents:
+                    # Loại bỏ phần tiêu đề lặp lại nếu có để text gọn sạch hơn
+                    context_string += f"{content}\n"
+                    
+        return context_string.strip()
+
+    def ask_legal_agent(self, question: str) -> Dict[str, any]:
+        """
+        Xử lý quy trình RAG: Nhận câu hỏi -> Tìm kiếm -> Gom nhóm -> Gọi Gemini -> Trả kết quả
+        """
+        if not self.vector_db:
+            return {"answer": "Hệ thống chưa nạp cơ sở dữ liệu luật!", "sources": []}
+            
+        # 1. Truy xuất top 5 đoạn văn bản liên quan nhất từ Vector DB
+        retrieved_docs = self.vector_db.similarity_search(question, k=5)
         
-        return response
+        # 2. Thực hiện chiến thuật Semantic Grouping (Sắp xếp lại bối cảnh)
+        clean_context = self._semantic_grouping(retrieved_docs)
+        
+        # 3. Xây dựng Prompt nghiêm ngặt cho LLM (Chống ảo giác cấu trúc luật)
+        system_prompt = (
+            "Bạn là một chuyên gia lập pháp tối cao tại Việt Nam. Nhiệm vụ của bạn là trả lời câu hỏi của người dùng "
+            "một cách chính xác, khách quan dựa trên bối cảnh pháp lý được cung cấp dưới đây.\n\n"
+            "⚠️ QUY TẮC BẮT BUỘC:\n"
+            "1. Chỉ trả lời dựa VÀO THÔNG TIN CÓ TRONG BỐI CẢNH. Không tự bịa đặt, không suy diễn thiếu căn cứ.\n"
+            "2. Nếu thông tin trong bối cảnh không đủ để trả lời, hãy nói thẳng: 'Dựa trên kho dữ liệu luật hiện tại, tôi không tìm thấy thông tin này.'\n"
+            "3. Cuối câu trả lời, hãy liệt kê rõ ràng các Điều luật và Tên văn bản mà bạn đã dùng làm căn cứ (Trích xuất từ bối cảnh).\n\n"
+            "=== BỐI CẢNH PHÁP LÝ ===\n"
+            "{context}\n"
+            "========================"
+        )
+        
+        prompt_template = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", "Câu hỏi: {question}")
+        ])
+        
+        # 4. Kích hoạt chuỗi và gọi Gemini Pro
+        rag_chain = prompt_template | self.llm
+        print("🤖 Gemini đang đọc luật và tổng hợp câu trả lời...")
+        ai_response = rag_chain.invoke({"context": clean_context, "question": question})
+        
+        # 5. Thu thập nguồn trích dẫn (Metadata) để hiển thị lên UI sau này
+        sources = []
+        for doc in retrieved_docs:
+            source_info = doc.metadata.get("source", "Không rõ nguồn")
+            if source_info not in sources:
+                sources.append(source_info)
+                
+        return {
+            "answer": ai_response.content,
+            "sources": sources
+        }
