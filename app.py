@@ -207,7 +207,7 @@ def main():
     st.divider()
     st.markdown("""
     <div style="text-align: center; color: #999; font-size: 0.9em;">
-        <p>🤖 Hệ Thống RAG Tra Cứu Luật Pháp Việt Nam | Sử dụng ChromaDB & Gemini 1.5 Pro</p>
+        <p>🤖 Hệ Thống RAG Tra Cứu Luật Pháp Việt Nam | Sử dụng ChromaDB & Gemini 2.5 Pro</p>
     </div>
     """, unsafe_allow_html=True)
 

@@ -59,7 +59,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 ### 6. Chạy Ứng Dụng
 ```bash
-streamlit run src/app.py
+python -m streamlit run app.py
 ```
 
 Ứng dụng sẽ mở tại `http://localhost:8501`

@@ -28,7 +28,7 @@ pip install -r requirements.txt
 # - data/Luật_Giao_dịch_Điện_tử.pdf
 
 # 6. Chạy Ứng Dụng
-streamlit run src/app.py
+python -m streamlit run app.py
 
 # Ứng dụng sẽ mở tại http://localhost:8501
 
