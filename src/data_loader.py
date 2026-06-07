@@ -8,7 +8,9 @@ import os
 import re
 from pathlib import Path
 from typing import List, Dict
+# pyrefly: ignore [missing-import]
 from pypdf import PdfReader
+# pyrefly: ignore [missing-import]
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 

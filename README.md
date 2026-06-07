@@ -1,204 +1,231 @@
 # ⚖️ Agent Tra Cứu Luật Pháp Việt Nam
 
-Hệ thống AI Agent cho phép tra cứu thông tin pháp luật Việt Nam bằng cách hỏi bằng ngôn ngữ tự nhiên. Sử dụng công nghệ **RAG (Retrieval-Augmented Generation)** kết hợp **Google Gemini API** để sinh ra câu trả lời chính xác.
+Hệ thống AI Agent cho phép tra cứu thông tin pháp luật Việt Nam bằng ngôn ngữ tự nhiên.  
+Ứng dụng công nghệ **RAG (Retrieval-Augmented Generation) v2.0** kết hợp **Google Gemini** để sinh ra câu trả lời chính xác, có căn cứ pháp lý rõ ràng.
 
-## 🎯 Tính Năng
+---
 
-- ✅ **Đọc PDF Luật**: Tự động load và xử lý file PDF từ thư mục `data/`
-- ✅ **Cắt Chunk Thông Minh**: Chia document theo cấu trúc "Điều X." của luật Việt Nam
-- ✅ **Vector Embeddings**: Sử dụng Vietnamese SBERT để hiểu semantic tiếng Việt
-- ✅ **Vector Database**: ChromaDB lưu trữ embeddings tối ưu cho tìm kiếm nhanh
-- ✅ **LLM Gemini Pro**: Generate response từ context được lấy ra
-- ✅ **Giao Diện Streamlit**: UI thân thiện, dễ sử dụng
-- ✅ **Trích Dẫn Nguồn**: Tự động cung cấp tham chiếu đến Điều/Bộ luật
+## 🎯 Tính Năng Chính
 
-## 📋 Yêu Cầu
+| Tính năng | Mô tả |
+|-----------|-------|
+| 📄 **Đọc PDF Luật** | Tự động load và trích xuất text từ file PDF trong thư mục `data/` |
+| ✂️ **Chunking Thông Minh** | Cắt chunk theo cấu trúc Điều → Khoản của luật Việt Nam, có cơ chế Fallback tự động |
+| 🔄 **Query Rewriting** | LLM pháp lý hóa câu hỏi trước khi tìm kiếm để tăng độ chính xác retrieval |
+| 🔍 **Hybrid Search** | Kết hợp Vector MMR (ngữ nghĩa) + BM25 (từ khóa) qua Reciprocal Rank Fusion |
+| 🧠 **Vietnamese SBERT** | Embedding chuyên biệt cho tiếng Việt (`keepitreal/vietnamese-sbert`) |
+| 🗄️ **ChromaDB** | Lưu trữ vector cục bộ, tái sử dụng không cần index lại |
+| ✨ **Structured Output** | Kết quả luôn có đủ 3 phần: Tóm tắt / Phân tích chi tiết / Căn cứ pháp lý (dạng bảng) |
+| 🖥️ **Giao Diện Streamlit** | UI thân thiện, có lịch sử tra cứu và thanh điều chỉnh Top-K |
 
-- Python 3.9+
-- Google API Key (Gemini Pro)
-- Các thư viện trong `requirements.txt`
+---
 
-## 🚀 Cài Đặt & Hướng Dẫn
+## 📋 Yêu Cầu Hệ Thống
 
-### 1. Clone Repository
+- **Python**: 3.9 trở lên (khuyến nghị 3.11)
+- **RAM**: tối thiểu 4 GB (8 GB khuyến nghị)
+- **Google Gemini API Key**: Lấy miễn phí tại [Google AI Studio](https://aistudio.google.com/app/apikey)
+
+---
+
+## 🚀 Hướng Dẫn Cài Đặt (Từ Đầu)
+
+### Bước 1 — Clone Repository
+
 ```bash
 git clone <repo_url>
 cd Agent_Law
 ```
 
-### 2. Tạo Virtual Environment
+### Bước 2 — Tạo Virtual Environment
+
 ```bash
 python -m venv venv
+```
 
-# Trên Windows
-venv\Scripts\activate
+Kích hoạt môi trường ảo:
 
-# Trên macOS/Linux
+```bash
+# Windows (PowerShell)
+.\venv\Scripts\activate
+
+# macOS / Linux
 source venv/bin/activate
 ```
 
-### 3. Cài Đặt Dependencies
+> Dấu `(venv)` xuất hiện ở đầu dòng terminal nghĩa là đã kích hoạt thành công.
+
+### Bước 3 — Cài Đặt Thư Viện
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Cấu Hình API Key
-Tạo file `.env` trong thư mục gốc:
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
+**Sau đó cài PyTorch CPU riêng** (tránh pip tự kéo bản CUDA nặng hàng GB):
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 ```
 
-**Lấy API Key**: 
-1. Vào https://makersuite.google.com/app/apikey
-2. Nhấp "Create API Key"
-3. Copy key vào `.env`
+> ⏳ Lần đầu cài sẽ mất vài phút. Lần sau chạy lại sẽ nhanh hơn vì đã có cache.
 
-### 5. Thêm File PDF
-- Đặt các file PDF luật pháp vào thư mục `data/`
-- Ví dụ: `data/Bộ_luật_Lao_động.pdf`
+### Bước 4 — Cấu Hình API Key
 
-### 6. Chạy Ứng Dụng
+Tạo file `.env` trong thư mục gốc (hoặc sao chép từ `.env.example`):
+
+```bash
+# Windows
+copy .env.example .env
+
+# macOS / Linux
+cp .env.example .env
+```
+
+Mở file `.env` và điền API Key của bạn:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+LLM_MODEL=gemini-2.5-flash
+LLM_TEMPERATURE=0.0
+```
+
+**Lấy Gemini API Key miễn phí:**
+1. Truy cập [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+2. Nhấp **"Create API Key"**
+3. Copy key và dán vào `.env`
+
+### Bước 5 — Thêm File PDF Luật
+
+Đặt các file PDF văn bản pháp luật vào thư mục `data/`:
+
+```
+Agent_Law/
+└── data/
+    ├── Bo_luat_Lao_dong.pdf
+    ├── Nghi_dinh_100_2019.pdf
+    └── ...
+```
+
+> Hệ thống hỗ trợ nhiều file PDF cùng lúc. PDF phải có **text thật** (không phải ảnh scan).
+
+### Bước 6 — Chạy Ứng Dụng
+
 ```bash
 python -m streamlit run app.py
 ```
 
-Ứng dụng sẽ mở tại `http://localhost:8501`
+Ứng dụng sẽ tự động mở tại: **`http://localhost:8501`**
+
+---
+
+## 🖥️ Hướng Dẫn Sử Dụng
+
+1. **Lần đầu tiên** — Nhấn nút **"🔄 Nạp Dữ Liệu PDF Mới"** ở sidebar để hệ thống đọc và index các file PDF vào ChromaDB. Quá trình này chỉ cần làm một lần (hoặc khi có file PDF mới).
+2. **Lần sau** — Hệ thống tự động kết nối lại dữ liệu đã index từ thư mục `database/`, không cần nạp lại.
+3. **Tra cứu** — Nhập câu hỏi bằng tiếng Việt tự nhiên vào ô tìm kiếm, nhấn **"🔎 Trích xuất câu trả lời"**.
+4. **Điều chỉnh Top-K** — Dùng thanh trượt ở sidebar để chỉnh số lượng đoạn luật dùng làm bối cảnh (khuyến nghị: 5–7).
+
+---
 
 ## 📁 Cấu Trúc Dự Án
 
 ```
 Agent_Law/
-├── data/                    # PDF files (Tự động tạo)
-│   └── *.pdf               # Đặt file PDF tại đây
-├── database/               # ChromaDB storage (Tự động tạo)
+├── data/                    # 📂 Đặt file PDF luật vào đây (tự động tạo khi chạy)
+│   └── *.pdf
+├── database/                # 🗄️ ChromaDB lưu vector embeddings (tự động tạo)
 ├── src/
-│   ├── __init__.py        # Package init
-│   ├── data_loader.py     # Đọc PDF, cắt chunk theo "Điều X."
-│   ├── rag_engine.py      # RAG: Embeddings, Vector DB, LLM
-│   └── app.py             # Streamlit app (file chạy chính)
-├── .env                   # API Keys (bạn phải tạo)
-├── .gitignore             # Git ignore rules
-├── requirements.txt       # Python dependencies
-└── README.md             # File này
+│   ├── __init__.py
+│   ├── data_loader.py       # Đọc PDF, làm sạch, cắt chunk theo Điều/Khoản
+│   └── rag_engine.py        # RAG Engine v2.0: Hybrid Search, Query Rewriting, LLM
+├── .env                     # 🔑 API Keys (bạn tự tạo, KHÔNG commit lên git)
+├── .env.example             # Mẫu cấu hình .env
+├── .gitignore
+├── app.py                   # Streamlit UI — file chạy chính
+├── requirements.txt         # Danh sách thư viện Python
+└── README.md
 ```
 
-## 🔧 Cấu Hình Chi Tiết
+---
 
-### data_loader.py
-```python
-from src.data_loader import LawDataLoader
+## ⚙️ Kiến Trúc RAG Pipeline v2.0
 
-loader = LawDataLoader(data_path="data")
-chunks = loader.process_all_documents()
-# Kết quả: List chunks với metadata {"document", "article", "source"}
+```
+Câu hỏi người dùng
+        │
+        ▼
+[1] Query Rewriting ──► LLM pháp lý hóa câu hỏi
+        │
+        ▼
+[2] Hybrid Search
+    ├── Vector MMR Search (60%) ──► ChromaDB
+    └── BM25 Keyword Search (40%) ──► Rank BM25
+        │
+        ▼
+    RRF — Reciprocal Rank Fusion
+        │
+        ▼
+[3] Semantic Grouping ──► Gom nhóm: Văn bản → Điều → Khoản
+        │
+        ▼
+[4] LLM Generation (Gemini) + Structured Prompt
+        │
+        ▼
+[5] Kết quả có cấu trúc:
+    📋 Tóm tắt
+    📖 Phân tích chi tiết
+    ⚖️ Căn cứ pháp lý (bảng)
 ```
 
-**Cách hoạt động:**
-- ✅ Load tất cả PDF trong `data/`
-- ✅ Làm sạch text (xóa ký tự lạ, khoảng trắng thừa)
-- ✅ Cắt theo regex pattern: `Điều \d+[a-zA-Z]*`
-- ✅ Giữ metadata: tên document, số điều, nguồn
+---
 
-### rag_engine.py
-```python
-from src.rag_engine import RAGEngine
+## 🛠️ Xử Lý Sự Cố Thường Gặp
 
-rag = RAGEngine(db_path="database")
-rag.add_documents(chunks)
+### ❌ `GEMINI_API_KEY not found`
+→ Kiểm tra file `.env` đã tồn tại và có đủ key chưa. Restart ứng dụng sau khi sửa.
 
-# Tra cứu
-response = rag.query("Quyền lao động là gì?", top_k=3)
+### ❌ `No PDFs found in data/`
+→ Kiểm tra đã đặt file PDF vào thư mục `data/`. Chỉ hỗ trợ PDF có text, không phải PDF ảnh scan.
+
+### ❌ `ModuleNotFoundError: No module named 'torchvision'`
+→ Chạy lệnh sau sau khi kích hoạt venv:
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 ```
 
-**Các bước:**
-1. **Embedding**: Input → GoogleGenerativeAIEmbeddings
-2. **Search**: ChromaDB cosine similarity search
-3. **Ranking**: Top-k kết quả có relevance cao nhất
-4. **Generation**: Gemini Pro tạo response từ context
-5. **Citation**: Tự động thêm nguồn tham khảo
+### ❌ Cảnh báo đỏ gạch chân import trong VS Code
+→ Nhấn `Ctrl+Shift+P` → **"Python: Select Interpreter"** → chọn `.\venv\Scripts\python.exe`.
 
-### app.py - Streamlit Interface
-- **Query Input**: Text area cho câu hỏi
-- **Search Button**: Kích hoạt RAG pipeline
-- **Response Display**: Hiển thị kết quả + nguồn
-- **History**: Lưu lịch sử 5 câu hỏi gần nhất
+### ⚠️ Lần đầu chạy rất chậm (5–15 phút)
+→ Hệ thống đang tải model embedding `vietnamese-sbert` từ HuggingFace (~400 MB). Lần sau sẽ dùng cache cục bộ và khởi động trong vài giây.
 
-## 💡 Ví Dụ Sử Dụng
+### ⚠️ Câu trả lời thiếu thông tin
+→ Tăng giá trị **Top-K** trong sidebar lên 7–10. Hoặc kiểm tra file PDF có text không bị lỗi encoding.
 
-### Câu Hỏi 1: Tìm Điều Cụ Thể
-```
-Input: Điều 24 Bộ luật Lao động nói về cái gì?
-Output: [Nội dung Điều 24 + nguồn]
-```
-
-### Câu Hỏi 2: Tìm Kiếm Semantic
-```
-Input: Quyền nghỉ phép của người lao động?
-Output: [Tìm tất cả điều liên quan đến nghỉ phép + context]
-```
-
-### Câu Hỏi 3: So Sánh
-```
-Input: Khác nhau giữa hợp đồng xác định thời hạn và không xác định thời hạn?
-Output: [Trích dẫn từ các Điều liên quan + so sánh]
-```
-
-## 🛠️ Troubleshooting
-
-### ❌ Lỗi: "GEMINI_API_KEY not found"
-**Giải pháp**: 
-- Tạo file `.env`
-- Thêm `GEMINI_API_KEY=your_key`
-- Restart ứng dụng
-
-### ❌ Lỗi: "No PDFs found in data/"
-**Giải pháp**:
-- Tạo thư mục `data/`
-- Đặt file PDF vào
-- Nhấp "Tải Dữ Liệu Mới" trong app
-
-### ❌ Lỗi: "ChromaDB connection failed"
-**Giải pháp**:
-- Kiểm tra `.env` có `CHROMADB_MODE=local`
-- Xóa thư mục `database/` và khởi động lại
-- Nếu dùng server: `docker run -p 8000:8000 chromadb/chroma`
-
-### ⚠️ Embedding chậm lần đầu tiên
-**Giải pháp**: Điều này bình thường (download model)
-
-## 📊 Performance Tips
-
-- **Chunk Size**: Hiện tại = 1 Điều. Nếu cần tối ưu, có thể gộp Điều nhỏ
-- **Top-K**: Mặc định 3. Tăng lên 5-10 cho câu hỏi phức tạp
-- **Temperature**: Đặt = 0 để sinh response xác định, consistent
+---
 
 ## 🔐 Bảo Mật
 
-- ⚠️ **Không commit `.env`** - Đã thêm vào `.gitignore`
-- ⚠️ **Bảo vệ API Key** - Dùng biến môi trường, không hardcode
-- ✅ **Sử dụng `.env.example`** để hướng dẫn setup (tùy chọn)
+- ⚠️ **KHÔNG commit file `.env`** lên git — đã được thêm vào `.gitignore`
+- ✅ Dùng `.env.example` để hướng dẫn người dùng mới cấu hình
+- ✅ API Key chỉ được đọc qua biến môi trường, không hardcode trong code
 
-## 📈 Mở Rộng Tương Lai
+---
 
-- [ ] Support thêm LLM providers (OpenAI, Claude, vv)
-- [ ] Thêm features: feedback, re-ranking
-- [ ] Cải thiện chunking logic
-- [ ] Hỗ trợ upload PDF trực tiếp trong UI
-- [ ] Export kết quả ra PDF/Word
-- [ ] Đa ngôn ngữ
+## 📈 Roadmap
+
+- [ ] Hỗ trợ upload PDF trực tiếp trong giao diện Streamlit
+- [ ] Thêm chức năng xuất kết quả ra file Word/PDF
+- [ ] Tích hợp thêm nguồn dữ liệu (văn bản luật online)
+- [ ] Hỗ trợ hỏi đáp đa lượt (Multi-turn Conversation)
+- [ ] Hỗ trợ GPU để tăng tốc embedding
+
+---
 
 ## 📜 License
 
 MIT License
 
-## 👤 Tác Giả
-
-Team Development
-
-## 📧 Support
-
-Liên hệ: [support email hoặc issue tracker]
-
 ---
 
-**Happy Querying! ⚖️✨**
+*⚖️ Hệ thống chỉ mang tính chất tham khảo. Mọi quyết định pháp lý quan trọng cần tham vấn luật sư chuyên nghiệp.*
