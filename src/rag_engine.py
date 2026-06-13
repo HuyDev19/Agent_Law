@@ -226,7 +226,7 @@ class LegalBrainEngine:
     # PIPELINE RAG CHÍNH
     # ─────────────────────────────────────────────────────────────
 
-    def ask_legal_agent(self, question: str) -> Dict[str, Any]:
+    def ask_legal_agent(self, question: str, top_k: int = 6) -> Dict[str, Any]:
         """
         Pipeline RAG v2.0 — 5 bước xử lý:
           Bước 1: Query Rewriting    — Pháp lý hóa câu hỏi
@@ -246,7 +246,7 @@ class LegalBrainEngine:
         rewritten_query = self._rewrite_query(question)
 
         # ── BƯỚC 2: Hybrid Search (MMR + BM25 + RRF) ─────────────
-        retrieved_docs = self._hybrid_search(rewritten_query, k=6)
+        retrieved_docs = self._hybrid_search(rewritten_query, k=top_k)
 
         if not retrieved_docs:
             return {
