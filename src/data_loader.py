@@ -12,6 +12,7 @@ from typing import List, Dict
 from pypdf import PdfReader
 # pyrefly: ignore [missing-import]
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+import json
 
 
 class LawDataLoader:
@@ -22,6 +23,7 @@ class LawDataLoader:
     def __init__(self, data_path: str = "data"):
         self.data_path = Path(data_path)
         self.data_path.mkdir(exist_ok=True)
+        self.tracking_file = self.data_path / "processed_files.json"
         
         # Khởi tạo công cụ cắt khúc với Overlap (Bước 1 của chiến lược)
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -30,16 +32,36 @@ class LawDataLoader:
             separators=["\n\n", "\n", ". ", " "]
         )
     
-    def load_pdfs(self) -> Dict[str, str]:
+    def get_processed_files(self) -> List[str]:
+        if self.tracking_file.exists():
+            try:
+                with open(self.tracking_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                return []
+        return []
+
+    def mark_as_processed(self, filenames: List[str]):
+        if not filenames:
+            return
+        processed = self.get_processed_files()
+        processed.extend([f for f in filenames if f not in processed])
+        with open(self.tracking_file, 'w', encoding='utf-8') as f:
+            json.dump(processed, f, ensure_ascii=False, indent=4)
+    
+    def load_pdfs(self) -> tuple[Dict[str, str], List[str]]:
         documents = {}
+        new_files = []
         if not self.data_path.exists():
             print(f"⚠️ Thư mục {self.data_path} không tồn tại")
-            return documents
+            return documents, new_files
         
-        pdf_files = list(self.data_path.glob("*.pdf"))
+        processed_files = self.get_processed_files()
+        pdf_files = [f for f in self.data_path.glob("*.pdf") if f.name not in processed_files]
+        
         if not pdf_files:
-            print(f"⚠️ Không tìm thấy file PDF trong {self.data_path}")
-            return documents
+            print("💡 Không có file PDF nào mới cần xử lý.")
+            return documents, new_files
         
         for pdf_file in pdf_files:
             try:
@@ -55,10 +77,11 @@ class LawDataLoader:
                     print(f"❌ LỖI TRÍCH XUẤT: {pdf_file.name} rỗng chữ (Có thể là PDF ảnh Scan).")
                 else:
                     documents[pdf_file.stem] = text
-                    print(f"✅ Đã tải: {pdf_file.name}")
+                    new_files.append(pdf_file.name)
+                    print(f"✅ Đã tải file mới: {pdf_file.name}")
             except Exception as e:
                 print(f"❌ Lỗi đọc {pdf_file.name}: {e}")
-        return documents
+        return documents, new_files
     
     def clean_text(self, text: str) -> str:
         # Làm sạch khoảng trắng nhưng giữ cấu trúc dòng
@@ -144,17 +167,17 @@ class LawDataLoader:
         print(f"📄 {document_name}: Tạo thành công {len(chunks)} chunks tối ưu")
         return chunks
 
-    def process_all_documents(self) -> List[Dict[str, str]]:
+    def process_all_documents(self) -> tuple[List[Dict[str, str]], List[str]]:
         all_chunks = []
-        documents = self.load_pdfs()
+        documents, new_files = self.load_pdfs()
         
         if not documents:
-            return []
+            return [], []
             
-        print(f"\n📚 Bắt đầu xử lý {len(documents)} document...\n")
+        print(f"\n📚 Bắt đầu xử lý {len(documents)} document mới...\n")
         for doc_name, text in documents.items():
             chunks = self.chunk_by_articles(text, doc_name)
             all_chunks.extend(chunks)
             
-        print(f"\n✨ Hoàn tất: {len(all_chunks)} chunks tổng cộng\n")
-        return all_chunks
+        print(f"\n✨ Hoàn tất: {len(all_chunks)} chunks tổng cộng cho các file mới\n")
+        return all_chunks, new_files

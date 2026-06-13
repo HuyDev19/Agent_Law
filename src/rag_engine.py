@@ -12,11 +12,17 @@ Pipeline cải tiến:
 import os
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
+# pyrefly: ignore [missing-import]
 from langchain_core.documents import Document
+# pyrefly: ignore [missing-import]
 from langchain_chroma import Chroma
+# pyrefly: ignore [missing-import]
 from langchain_huggingface import HuggingFaceEmbeddings
+# pyrefly: ignore [missing-import]
 from langchain_google_genai import ChatGoogleGenerativeAI
+# pyrefly: ignore [missing-import]
 from langchain_core.prompts import ChatPromptTemplate
+# pyrefly: ignore [missing-import]
 from langchain_community.retrievers import BM25Retriever
 
 # Tải biến môi trường từ file .env
@@ -40,7 +46,7 @@ class LegalBrainEngine:
         )
 
         # Đọc cấu hình linh hoạt từ file .env
-        model_name = os.getenv("LLM_MODEL", "gemini-2.5-flash")
+        model_name = os.getenv("LLM_MODEL", "gemini-2.5-flash-lite")
         temperature_val = float(os.getenv("LLM_TEMPERATURE", 0.0))
 
         print(f"🧠 Đang kết nối Bộ não LLM ({model_name})...")

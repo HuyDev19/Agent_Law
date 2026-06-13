@@ -6,6 +6,7 @@ import os
 import re
 from pathlib import Path
 from dotenv import load_dotenv
+# pyrefly: ignore [missing-import]
 import streamlit as st
 
 # Load biến môi trường
@@ -187,29 +188,35 @@ def init_session_state():
 
 def load_and_index_data():
     """Tải dữ liệu từ PDF và indexing vào Vector DB"""
-    with st.spinner("⏳ Đang xử lý và nhúng dữ liệu vào não AI..."):
+    with st.spinner("⏳ Đang kiểm tra và nhúng dữ liệu mới vào não AI..."):
         try:
             # Bước 1: Load và cắt chunk từ data_loader
             loader = LawDataLoader(data_path="data")
-            chunks = loader.process_all_documents()
+            chunks, new_files = loader.process_all_documents()
+            
+            # Bước 2: Khởi tạo LegalBrainEngine nếu chưa có hoặc load DB cũ
+            if st.session_state.rag_engine is None:
+                rag_engine = LegalBrainEngine(db_path="database")
+                if os.path.exists("database") and os.listdir("database"):
+                    rag_engine.load_existing_db()
+                st.session_state.rag_engine = rag_engine
+                st.session_state.data_loaded = True
             
             if not chunks:
-                st.warning(
-                    "⚠️ Không thể nạp dữ liệu. Lý do có thể là:\n"
-                    "- Thư mục `data/` không có file PDF nào.\n"
-                    "- Các file PDF là ảnh scan, không có nội dung text.\n"
-                    "- File PDF bị lỗi hoặc trống."
-                )
-                return False
+                if st.session_state.data_loaded:
+                    st.info("✅ Dữ liệu hiện tại đã được đồng bộ, không có file PDF nào mới cần xử lý.")
+                else:
+                    st.warning("⚠️ Không tìm thấy file PDF nào trong thư mục `data/` để nạp.")
+                return True
             
-            # Bước 2: Khởi tạo LegalBrainEngine và nạp dữ liệu (create_vector_db)
-            rag_engine = LegalBrainEngine(db_path="database")
-            rag_engine.create_vector_db(chunks)
+            # Nạp dữ liệu mới vào DB
+            st.session_state.rag_engine.create_vector_db(chunks)
             
-            st.session_state.rag_engine = rag_engine
+            # Đánh dấu các file mới đã nạp thành công để lần sau bỏ qua
+            loader.mark_as_processed(new_files)
+            
             st.session_state.data_loaded = True
-            
-            st.success(f"✅ Đã tải và indexing {len(chunks)} phân đoạn luật thành công!")
+            st.success(f"✅ Đã tải và indexing {len(chunks)} phân đoạn luật mới thành công!")
             return True
             
         except Exception as e:
