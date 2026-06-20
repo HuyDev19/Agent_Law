@@ -1,13 +1,13 @@
 """
 Data Loader Module - Đọc PDF, làm sạch dữ liệu và cắt chunk theo chiến lược:
-1. Nhận diện "Điều" -> 2. Nhận diện "Khoản" -> 3. Tiêm Tiêu đề -> 4. Overlap 150 ký tự.
+1. Nhận diện "Điều" -> 2. Nhận diện "Khoản" -> 3. Tiêm Ngữ cảnh Văn bản -> 4. Overlap 150 ký tự.
 Có bổ sung cơ chế Fallback tự động cắt nếu không nhận diện được cấu trúc Điều.
 """
 
 import os
 import re
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Tuple
 # pyrefly: ignore [missing-import]
 from pypdf import PdfReader
 # pyrefly: ignore [missing-import]
@@ -49,7 +49,7 @@ class LawDataLoader:
         with open(self.tracking_file, 'w', encoding='utf-8') as f:
             json.dump(processed, f, ensure_ascii=False, indent=4)
     
-    def load_pdfs(self) -> tuple[Dict[str, str], List[str]]:
+    def load_pdfs(self) -> Tuple[Dict[str, str], List[str]]:
         documents = {}
         new_files = []
         if not self.data_path.exists():
@@ -92,16 +92,16 @@ class LawDataLoader:
     def chunk_by_articles(self, text: str, document_name: str) -> List[Dict[str, str]]:
         chunks = []
         
-        # CẢI TIẾN 1: Regex linh hoạt, không phân biệt hoa thường (?i), chấp nhận chữ Điều bị dính khoảng trắng ẩn
+        # Regex linh hoạt, không phân biệt hoa thường (?i), chấp nhận chữ Điều bị dính khoảng trắng ẩn
         article_pattern = r'(?i)(?:điều|đ\s*i\s*ề\s*u)\s+(\d+[a-zA-Z]*)'
         matches = list(re.finditer(article_pattern, text))
         
-        # CẢI TIẾN 2: Cơ chế lưới đỡ AN TOÀN (Fallback) - Tránh mất file dữ liệu
+        # Cơ chế lưới đỡ AN TOÀN (Fallback) - Tránh mất file dữ liệu nếu cấu trúc văn bản dị biệt
         if not matches:
             print(f"💡 {document_name}: Không khớp cấu trúc 'Điều' -> Kích hoạt tự động cắt phân đoạn.")
             split_docs = self.text_splitter.split_text(text)
             for idx, split_text in enumerate(split_docs):
-                chunk_title = f"📌 Tài liệu: {document_name} (Phần {idx + 1})"
+                chunk_title = f"🏢 Văn bản: {document_name} | 📌 Phần {idx + 1}"
                 chunks.append({
                     "content": f"{chunk_title}\n{split_text}",
                     "metadata": {
@@ -135,7 +135,9 @@ class LawDataLoader:
                     
                     split_docs = self.text_splitter.split_text(full_khoan_text)
                     for idx, split_text in enumerate(split_docs):
-                        chunk_title = f"📌 Điều {article_num} | Khoản {khoan_num.replace('.', '')}"
+                        # NÂNG CẤP: Tiêm rõ tên Văn bản vào tiêu đề chunk nội dung để tối ưu hóa mô hình Embedding
+                        clean_khoan_num = khoan_num.replace('.', '')
+                        chunk_title = f"🏢 Văn bản: {document_name} | 📌 Điều {article_num} | Khoản {clean_khoan_num}"
                         if len(split_docs) > 1:
                             chunk_title += f" (Phần {idx + 1})"
                             
@@ -144,14 +146,14 @@ class LawDataLoader:
                             "metadata": {
                                 "document": document_name,
                                 "article": article_num,
-                                "khoan": khoan_num.replace('.', ''),
-                                "source": f"{document_name} - Điều {article_num} - Khoản {khoan_num.replace('.', '')}"
+                                "khoan": clean_khoan_num,
+                                "source": f"{document_name} — Điều {article_num}, Khoản {clean_khoan_num}"
                             }
                         })
             else:
                 split_docs = self.text_splitter.split_text(article_body)
                 for idx, split_text in enumerate(split_docs):
-                    chunk_title = f"📌 Điều {article_num}"
+                    chunk_title = f"🏢 Văn bản: {document_name} | 📌 Điều {article_num}"
                     if len(split_docs) > 1:
                         chunk_title += f" (Phần {idx + 1})"
                         
@@ -160,14 +162,14 @@ class LawDataLoader:
                         "metadata": {
                             "document": document_name,
                             "article": article_num,
-                            "source": f"{document_name} - Điều {article_num}"
+                            "source": f"{document_name} — Điều {article_num}"
                         }
                     })
                     
-        print(f"📄 {document_name}: Tạo thành công {len(chunks)} chunks tối ưu")
+        print(f"📄 {document_name}: Tạo thành công {len(chunks)} chunks tối ưu cấu trúc pháp lý.")
         return chunks
 
-    def process_all_documents(self) -> tuple[List[Dict[str, str]], List[str]]:
+    def process_all_documents(self) -> Tuple[List[Dict[str, str]], List[str]]:
         all_chunks = []
         documents, new_files = self.load_pdfs()
         
