@@ -248,24 +248,43 @@ class LegalBrainEngine:
             "⚠️ QUY TẮC BẮT BUỘC:\n"
             "1. CHỈ sử dụng thông tin CÓ TRONG BỐI CẢNH. Tuyệt đối không tự suy diễn hoặc thêm kiến thức bên ngoài.\n"
             "2. NGẮT MẠCH TỰ ĐỘNG: Nếu bối cảnh hoàn toàn KHÔNG liên quan, CHỈ ĐƯỢC PHÉP trả lời đúng 1 câu sau và DỪNG LẠI:\n"
-            "'*Kho dữ liệu hiện tại chưa có quy định pháp lý trực tiếp cho tình huống này.*'\n\n"
-            "3. CHỈ KHI bối cảnh CÓ ĐỦ THÔNG TIN, bạn mới được phép phân tích và BẮT BUỘC trình bày theo đúng cấu trúc 4 PHẦN sau:\n\n"
+            "'*Kho dữ liệu hiện tại chưa có quy định pháp lý trực tiếp cho tình huống này.*'\n"
+            "3. ƯU TIÊN TRẢ LỜI CÂU HỎI: Nếu người dùng có đặt ra các câu hỏi cụ thể, BẮT BUỘC phải tập trung giải đáp trực tiếp các câu hỏi đó đầu tiên.\n"
+            "4. CHỈ KHI bối cảnh CÓ ĐỦ THÔNG TIN, bạn mới được phép phân tích và BẮT BUỘC trình bày theo đúng cấu trúc 6 PHẦN sau:\n\n"
 
-            "## 📋 TÓM TẮT\n"
-            "- Trả lời trực diện, khẳng định ngay vấn đề trong 2 - 3 câu.\n\n"
+            "## ⚡ KẾT LUẬN NHANH\n"
+            "- BẮT BUỘC sử dụng thẻ trích dẫn (Blockquote `>`) để làm nổi bật kết luận. Trả lời trực diện, khẳng định ngay vấn đề và giải đáp trực tiếp câu hỏi trọng tâm.\n"
+            "- Ví dụ: `> **Kết luận:** Hành vi này đã vi phạm...`\n\n"
+
+            "---\n\n"
 
             "## 📖 PHÂN TÍCH CHI TIẾT\n"
-            "- Phân tích chi tiết, trích dẫn từ khóa/mức phạt (dùng bullet points và bôi đậm).\n\n"
+            "- Phân tích chi tiết hành vi, đối chiếu với bối cảnh và quy định (bao gồm Luật CNTT, Dân sự, Hình sự... nếu có).\n"
+            "- BẮT BUỘC dùng gạch đầu dòng (bullet points) cho các ý chính. Bôi đậm (`**...**`) các thuật ngữ pháp lý, tên luật để người dùng dễ 'quét' mắt.\n\n"
+
+            "---\n\n"
+
+            "## 🚨 BIỆN PHÁP XỬ PHẠT & TRÁCH NHIỆM\n"
+            "- Liệt kê rành mạch các mức phạt tiền, hình phạt bổ sung, hoặc trách nhiệm bồi thường (nếu có).\n"
+            "- Bôi đậm các con số, mức phạt (VD: `**Phạt tiền từ 10.000.000đ đến 20.000.000đ**`).\n\n"
+
+            "---\n\n"
+
+            "## 🏛️ BẢN ÁN & ÁN LỆ LIÊN QUAN\n"
+            "- Nếu có, trích dẫn tên bản án/án lệ bằng chữ in nghiêng (`*Bản án số...*`). Nếu không, ghi: `*Chưa ghi nhận bản án/án lệ liên quan trong dữ liệu hiện tại*`.\n\n"
+
+            "---\n\n"
 
             "## ⚖️ CĂN CỨ PHÁP LÝ\n"
-            "- Liệt kê nội dung áp dụng và bắt buộc vẽ Bảng tổng hợp nguồn trích dẫn:\n"
+            "- Vẽ Bảng tổng hợp nguồn trích dẫn rõ ràng, căn lề chuẩn xác:\n"
             "| Văn bản/Nguồn | Điều khoản/Chi tiết | Nội dung áp dụng |\n"
-            "|---------|-------------|------------------|\n\n"
+            "| :--- | :--- | :--- |\n\n"
 
-            "## 💡 CÂU HỎI GỢI Ý\n"
+            "---\n\n"
+
+            "## 💡 GỢI Ý ĐÀO SÂU\n"
             "- ĐÂY LÀ PHẦN BẮT BUỘC PHẢI CÓ Ở CUỐI CÙNG.\n"
-            "- Đề xuất đúng 2 đến 3 câu hỏi tiếp theo để người dùng đào sâu vấn đề.\n"
-            "- Bắt đầu mỗi câu bằng dấu gạch ngang (-).\n\n"
+            "- Đề xuất 2 đến 3 câu hỏi liên quan tiếp theo để người dùng đào sâu vấn đề. Bắt đầu mỗi câu bằng biểu tượng `👉`.\n\n"
 
             "=== BỐI CẢNH PHÁP LÝ ===\n"
             "{context}\n"
@@ -295,8 +314,8 @@ class LegalBrainEngine:
                 wrapper = DuckDuckGoSearchAPIWrapper(region="wt-wt", max_results=4)
                 search = DuckDuckGoSearchResults(api_wrapper=wrapper)
                 
-                # Nâng cấp câu truy vấn để ép công cụ Web tìm Nghị định xử phạt
-                web_query = rewritten_query + " quy định pháp luật việt nam nghị định mức phạt"
+                # Nâng cấp câu truy vấn để ép công cụ Web tìm quy định, nghị định, mức phạt hoặc án lệ liên quan
+                web_query = rewritten_query + " quy định pháp luật luật chuyên ngành nghị định mức phạt việt nam"
                 web_raw_data = search.run(web_query)
                 
                 if web_raw_data:
