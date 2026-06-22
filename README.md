@@ -85,7 +85,7 @@ Mở file `.env` và điền API Key của bạn:
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
-LLM_MODEL=gemini-2.5-flash
+LLM_MODEL=gemini-3.1-flash-lite
 LLM_TEMPERATURE=0.0
 ```
 
@@ -224,9 +224,9 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 ## 📈 Roadmap
 
 - [x] Hỗ trợ upload PDF trực tiếp trong giao diện Streamlit
-- [ ] Thêm chức năng xuất kết quả ra file Word/PDF
+- [x] Thêm chức năng xuất kết quả ra file Word/PDF
 - [ ] Tích hợp thêm nguồn dữ liệu (văn bản luật online)
-- [ ] Hỗ trợ hỏi đáp đa lượt (Multi-turn Conversation)
+- [x] Hỗ trợ hỏi đáp đa lượt (Multi-turn Conversation)
 - [ ] Hỗ trợ GPU để tăng tốc embedding
 
 ---
