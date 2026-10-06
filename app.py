@@ -16,6 +16,20 @@ import streamlit as st
 # ─── Load biến môi trường ───────────────────────────────────────────────────
 load_dotenv()
 
+
+def _load_streamlit_secrets() -> None:
+    """Đưa cấu hình Streamlit Cloud vào biến môi trường mà backend đang dùng."""
+    try:
+        for key in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "LLM_MODEL", "LLM_TEMPERATURE"):
+            if not os.getenv(key) and key in st.secrets:
+                os.environ[key] = str(st.secrets[key])
+    except Exception:
+        # st.secrets không tồn tại khi chạy local mà không cấu hình secrets.toml.
+        pass
+
+
+_load_streamlit_secrets()
+
 # ─── Import logic gốc (KHÔNG thay đổi) ─────────────────────────────────────
 from src.data_loader import LawDataLoader
 from src.rag_engine import LegalBrainEngine

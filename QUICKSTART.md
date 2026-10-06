@@ -30,6 +30,11 @@ pip install -r requirements.txt
 
 # - Lấy API Key tại: https://makersuite.google.com/app/apikey
 
+# Nếu chạy trên Streamlit Cloud, vào App settings > Secrets và thêm:
+# GEMINI_API_KEY = "your_gemini_api_key_here"
+# LLM_MODEL = "gemini-3.1-flash-lite"
+# LLM_TEMPERATURE = "0.0"
+
 # 5. Đặt PDF vào thư mục data/
 
 # Ví dụ:

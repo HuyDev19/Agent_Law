@@ -46,13 +46,23 @@ class LegalBrainEngine:
         )
 
         model_name = os.getenv("LLM_MODEL", "gemini-3.1-flash-lite")
-        temperature_val = float(os.getenv("LLM_TEMPERATURE", 0.0))
+        try:
+            temperature_val = float(os.getenv("LLM_TEMPERATURE", "0.0"))
+        except ValueError as exc:
+            raise ValueError("LLM_TEMPERATURE phải là một số, ví dụ 0 hoặc 0.2.") from exc
+
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "Chưa cấu hình GEMINI_API_KEY (hoặc GOOGLE_API_KEY). "
+                "Local: thêm khóa vào file .env; Streamlit Cloud: thêm khóa vào App Settings > Secrets."
+            )
 
         print(f"🧠 Đang kết nối Bộ não LLM ({model_name})...")
         self.llm = ChatGoogleGenerativeAI(
             model=model_name,
             temperature=temperature_val,
-            google_api_key=os.getenv("GEMINI_API_KEY")
+            google_api_key=api_key
         )
 
         self.vector_db: Optional[Chroma] = None

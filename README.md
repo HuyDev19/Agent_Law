@@ -89,6 +89,18 @@ LLM_MODEL=gemini-3.1-flash-lite
 LLM_TEMPERATURE=0.0
 ```
 
+**Nếu chạy trên Streamlit Cloud:** vào **App settings → Secrets** và thêm TOML sau
+(không commit API key vào repository):
+
+```toml
+GEMINI_API_KEY = "your_gemini_api_key_here"
+LLM_MODEL = "gemini-3.1-flash-lite"
+LLM_TEMPERATURE = "0.0"
+```
+
+Ứng dụng tự đọc các giá trị này từ `st.secrets`. Có thể dùng `GOOGLE_API_KEY`
+thay cho `GEMINI_API_KEY` nếu đó là tên secret hiện có.
+
 **Lấy Gemini API Key miễn phí:**
 
 1. Truy cập [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
